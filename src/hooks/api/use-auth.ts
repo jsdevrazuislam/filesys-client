@@ -29,9 +29,11 @@ export const useLogin = () => {
 
       // 1. Invalidate and await auth queries
       await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+      // Hints are set by backend cookies, but we ensure they are present for logic
       Cookies.set("has_session", "true");
       Cookies.set("user_role", data.user.role);
       Cookies.set("access_token", data.token);
+      Cookies.set("refresh_token", data.refreshToken);
 
       toast.success("Welcome back!");
 
@@ -154,7 +156,6 @@ export const useVerifyEmail = () => {
 };
 
 export const useGetCurrentUser = () => {
-  const { isAuthenticated, user } = useAuthStore();
   const hasSessionHint = Cookies.get("has_session") === "true";
 
   return useQuery({
@@ -163,8 +164,7 @@ export const useGetCurrentUser = () => {
       const response = await axiosInstance.get<ApiResponse<User>>("/auth/me");
       return (response as unknown as ApiResponse<User>).data;
     },
-    // Only run if we have a session hint AND (we aren't authenticated yet OR we don't have a user object)
-    enabled: hasSessionHint && (!isAuthenticated || !user),
+    enabled: hasSessionHint ? true : false,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: (failureCount, error: { status?: number }) => {
       if (error.status === 401) return false;

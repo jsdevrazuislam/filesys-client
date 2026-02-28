@@ -1,3 +1,5 @@
+import { AxiosRequestConfig } from "axios";
+
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -18,4 +20,8 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   success: boolean;
   message: string;
+}
+
+export interface Config extends AxiosRequestConfig {
+  _retry?: boolean;
 }

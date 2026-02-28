@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-
+import Cookies from "js-cookie";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export const axiosInstance = axios.create({
@@ -13,14 +13,64 @@ export const axiosInstance = axios.create({
 // Interceptor for requests is no longer needed for token injection
 // because we are using HttpOnly cookies automatically sent by the browser.
 
-import { ApiError } from "@/types/api";
+import { ApiError, Config } from "@/types/api";
+
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 axiosInstance.interceptors.response.use(
   (response) => response.data,
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
+    const originalRequest = error.config as unknown as Config;
     const status = error.response?.status;
     const message =
       error.response?.data?.message || error.message || "An unexpected error occurred";
+
+    // If 401 and not already retrying
+    if (status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => axiosInstance(originalRequest))
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        await axiosInstance.post("/auth/refresh");
+        processQueue(null);
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError as Error);
+        // On refresh failure, redirect to login if we have a session hint
+        if (typeof window !== "undefined") {
+          Cookies.remove("has_session");
+          Cookies.remove("user_role");
+          Cookies.remove("access_token");
+          Cookies.remove("refresh_token");
+        }
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
 
     const normalizedError = {
       status,
