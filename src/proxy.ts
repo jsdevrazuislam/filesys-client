@@ -31,6 +31,7 @@ export function proxy(request: NextRequest) {
     (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`)
   );
 
+  console.log(userRole, isProtectedRoute, hasSession);
   if (isProtectedRoute) {
     if (!hasSession) {
       const loginUrl = new URL("/", request.url);
