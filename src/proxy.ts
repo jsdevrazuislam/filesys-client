@@ -32,11 +32,11 @@ export function proxy(request: NextRequest) {
   );
 
   if (isProtectedRoute) {
-    // if (!hasSession) {
-    //   const loginUrl = new URL("/", request.url);
-    //   loginUrl.searchParams.set("callbackUrl", pathname);
-    //   return NextResponse.redirect(loginUrl);
-    // }
+    if (!hasSession) {
+      const loginUrl = new URL("/", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
 
     // Role-based protection for /admin
     if (normalizedPath.startsWith("/admin") && userRole !== "ADMIN") {
