@@ -17,17 +17,29 @@ export const useLogin = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: LoginFormValues) => {
+    mutationFn: async (data: LoginFormValues & { callbackUrl?: string }) => {
       const response = await axiosInstance.post<ApiResponse<AuthResponse>>("/auth/login", data);
-      // Since interceptor returns response.data, 'response' here is ApiResponse<AuthResponse>
-      return (response as unknown as ApiResponse<AuthResponse>).data;
+      return {
+        ...(response as unknown as ApiResponse<AuthResponse>).data,
+        callbackUrl: data.callbackUrl,
+      };
     },
-    onSuccess: (data: AuthResponse) => {
+    onSuccess: async (data: AuthResponse & { callbackUrl?: string }) => {
       setAuth(data.user, data.token);
-      queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+
+      // 1. Invalidate and await auth queries
+      await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+
+      // 2. Small delay to ensure cookies (has_session, user_role) are persisted by the browser
+      // before the Next.js router triggers middleware/server-side checks
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       toast.success("Welcome back!");
 
-      if (data.user.role === "ADMIN") {
+      // 3. Handle Redirect
+      if (data.callbackUrl) {
+        router.replace(data.callbackUrl);
+      } else if (data.user.role === "ADMIN") {
         router.push("/admin");
       } else {
         router.push("/user");

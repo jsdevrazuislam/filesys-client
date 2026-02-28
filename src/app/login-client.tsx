@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -16,6 +17,8 @@ import { useLogin } from "@/hooks/api/use-auth";
 export default function LoginClient() {
   const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useLogin();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || undefined;
 
   const {
     register,
@@ -30,7 +33,7 @@ export default function LoginClient() {
   });
 
   const onSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
+    loginMutation.mutate({ ...data, callbackUrl });
   };
 
   const loading = loginMutation.isPending;
