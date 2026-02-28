@@ -31,10 +31,7 @@ export const useLogin = () => {
       await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
       Cookies.set("has_session", "true");
       Cookies.set("user_role", data.user.role);
-
-      // 2. Small delay to ensure cookies (has_session, user_role) are persisted by the browser
-      // before the Next.js router triggers middleware/server-side checks
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      Cookies.set("access_token", data.token);
 
       toast.success("Welcome back!");
 
