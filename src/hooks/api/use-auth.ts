@@ -24,12 +24,12 @@ export const useLogin = () => {
         callbackUrl: data.callbackUrl,
       };
     },
-    onSuccess: async (data: AuthResponse & { callbackUrl?: string }) => {
+    onSuccess: (data: AuthResponse & { callbackUrl?: string }) => {
       setAuth(data.user, data.token);
 
-      // 1. Invalidate and await auth queries
-      await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
-      // Hints are set by backend cookies, but we ensure they are present for logic
+      queryClient.setQueryData(["auth-user"], data.user);
+      queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+
       Cookies.set("has_session", "true");
       Cookies.set("user_role", data.user.role);
       Cookies.set("access_token", data.token);
@@ -37,7 +37,6 @@ export const useLogin = () => {
 
       toast.success("Welcome back!");
 
-      // 3. Handle Redirect
       if (data.callbackUrl) {
         router.replace(data.callbackUrl);
       } else if (data.user.role === "ADMIN") {

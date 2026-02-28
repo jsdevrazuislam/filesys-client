@@ -9,13 +9,13 @@ import { useGetCurrentUser } from "@/hooks/api/use-auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setAuth } = useAuthStore();
+  const { setAuth, isAuthenticated } = useAuthStore();
   const { data: user, isLoading, isFetched } = useGetCurrentUser();
   const pathname = usePathname();
 
   useEffect(() => {
     if (user) {
-      setAuth(user, ""); // token handled by HttpOnly cookies
+      setAuth(user, "");
     }
   }, [user, setAuth]);
 
@@ -23,9 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const publicRoutes = ["/", "/register", "/forgot-password", "/reset-password"];
   const isPublicRoute = publicRoutes.includes(pathname);
 
-  // 1. If we have a session hint but no user yet, AND we are loading, show global loader
-  // This prevents protected routes from rendering with empty state (blank page)
-  const isVerifying = hasSessionHint && !user && (isLoading || !isFetched);
+  const isVerifying = hasSessionHint && !isAuthenticated && !user && (isLoading || !isFetched);
 
   if (isVerifying && !isPublicRoute) {
     return (
