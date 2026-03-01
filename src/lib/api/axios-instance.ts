@@ -44,7 +44,6 @@ axiosInstance.interceptors.response.use(
     if (status === 401 && !originalRequest._retry) {
       const isAuthRoute =
         originalRequest.url?.includes("/auth/login") ||
-        originalRequest.url?.includes("/auth/logout") ||
         originalRequest.url?.includes("/auth/refresh");
 
       const hasSessionHint = Cookies.get("has_session") === "true";

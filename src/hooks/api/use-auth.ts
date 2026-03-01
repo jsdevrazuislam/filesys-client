@@ -75,7 +75,7 @@ export const useLogout = () => {
 
   return useMutation({
     mutationFn: async () => {
-      await axiosInstance.post("/auth/logout");
+      return Promise.resolve();
     },
     onSuccess: () => {
       // 1. Clear session hints BEFORE clearing store or cache
@@ -92,20 +92,6 @@ export const useLogout = () => {
       logoutStore();
       queryClient.clear();
       router.push("/");
-      toast.success("Logged out successfully");
-    },
-    onError: (error: { message: string }) => {
-      // Hard logout even on error
-      Cookies.remove("has_session", { path: "/" });
-      Cookies.remove("user_role", { path: "/" });
-      Cookies.remove("access_token", { path: "/" });
-      Cookies.remove("refresh_token", { path: "/" });
-      queryClient.cancelQueries({ queryKey: ["auth-user"] });
-      queryClient.removeQueries({ queryKey: ["auth-user"] });
-      logoutStore();
-      queryClient.clear();
-      router.push("/");
-      toast.error(error.message || "Logout issues, session cleared locally");
     },
   });
 };
