@@ -4,6 +4,7 @@ import { LogOut, Menu } from "lucide-react";
 import React, { useState } from "react";
 
 import { DashboardSidebar } from "@/components/layouts/DashboardSidebar";
+import { PlanLimitBanner } from "@/components/shared/plan-limit-banner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,7 +87,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 animate-in fade-in duration-500">{children}</main>
+        <main className="flex-1 animate-in fade-in duration-500 overflow-y-auto px-4 sm:px-6 py-4">
+          {user?.role === "USER" && <PlanLimitBanner />}
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -17,6 +17,8 @@ export interface UserStats {
   storageUsagePercentage: number;
   planName: string;
   allowedTypes: string[];
+  isLimitExceeded: boolean;
+  exceededLimits: string[];
 }
 
 export const useUserStats = () => {

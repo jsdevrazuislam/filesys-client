@@ -42,6 +42,20 @@ axiosInstance.interceptors.response.use(
 
     // If 401 and not already retrying
     if (status === 401 && !originalRequest._retry) {
+      const isAuthRoute =
+        originalRequest.url?.includes("/auth/login") ||
+        originalRequest.url?.includes("/auth/logout") ||
+        originalRequest.url?.includes("/auth/refresh");
+
+      const hasSessionHint = Cookies.get("has_session") === "true";
+
+      // Don't attempt refresh if:
+      // 1. It's an auth route already (to avoid infinite loops)
+      // 2. We don't have a session hint (user is likely already logged out)
+      if (isAuthRoute || !hasSessionHint) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -61,10 +75,10 @@ axiosInstance.interceptors.response.use(
         processQueue(refreshError as Error);
         // On refresh failure, redirect to login if we have a session hint
         if (typeof window !== "undefined") {
-          Cookies.remove("has_session");
-          Cookies.remove("user_role");
-          Cookies.remove("access_token");
-          Cookies.remove("refresh_token");
+          Cookies.remove("has_session", { path: "/" });
+          Cookies.remove("user_role", { path: "/" });
+          Cookies.remove("access_token", { path: "/" });
+          Cookies.remove("refresh_token", { path: "/" });
         }
         return Promise.reject(refreshError);
       } finally {

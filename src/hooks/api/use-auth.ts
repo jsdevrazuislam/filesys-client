@@ -30,10 +30,10 @@ export const useLogin = () => {
       queryClient.setQueryData(["auth-user"], data.user);
       queryClient.invalidateQueries({ queryKey: ["auth-user"] });
 
-      Cookies.set("has_session", "true");
-      Cookies.set("user_role", data.user.role);
-      Cookies.set("access_token", data.token);
-      Cookies.set("refresh_token", data.refreshToken);
+      Cookies.set("has_session", "true", { path: "/" });
+      Cookies.set("user_role", data.user.role, { path: "/" });
+      Cookies.set("access_token", data.token, { path: "/" });
+      Cookies.set("refresh_token", data.refreshToken, { path: "/" });
 
       toast.success("Welcome back!");
 
@@ -58,9 +58,9 @@ export const useRegister = () => {
     mutationFn: async (data: { name: string; email: string; password: string }) => {
       await axiosInstance.post("/auth/register", data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Account created! Please check your email to verify.");
-      router.push("/");
+      router.push(`/verify-notice?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error: { message: string }) => {
       toast.error(error.message || "Failed to create account");
@@ -79,8 +79,10 @@ export const useLogout = () => {
     },
     onSuccess: () => {
       // 1. Clear session hints BEFORE clearing store or cache
-      Cookies.remove("has_session");
-      Cookies.remove("user_role");
+      Cookies.remove("has_session", { path: "/" });
+      Cookies.remove("user_role", { path: "/" });
+      Cookies.remove("access_token", { path: "/" });
+      Cookies.remove("refresh_token", { path: "/" });
 
       // 2. Cancel and remove auth queries synchronously
       queryClient.cancelQueries({ queryKey: ["auth-user"] });
@@ -94,8 +96,10 @@ export const useLogout = () => {
     },
     onError: (error: { message: string }) => {
       // Hard logout even on error
-      Cookies.remove("has_session");
-      Cookies.remove("user_role");
+      Cookies.remove("has_session", { path: "/" });
+      Cookies.remove("user_role", { path: "/" });
+      Cookies.remove("access_token", { path: "/" });
+      Cookies.remove("refresh_token", { path: "/" });
       queryClient.cancelQueries({ queryKey: ["auth-user"] });
       queryClient.removeQueries({ queryKey: ["auth-user"] });
       logoutStore();
@@ -163,7 +167,7 @@ export const useGetCurrentUser = () => {
       const response = await axiosInstance.get<ApiResponse<User>>("/auth/me");
       return (response as unknown as ApiResponse<User>).data;
     },
-    enabled: hasSessionHint ? true : false,
+    enabled: !!hasSessionHint,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: (failureCount, error: { status?: number }) => {
       if (error.status === 401) return false;
