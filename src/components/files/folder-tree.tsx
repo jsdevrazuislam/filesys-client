@@ -1,8 +1,23 @@
 "use client";
-
-import { ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import React, { useState } from "react";
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { Folder as FolderType } from "@/types/files";
 
@@ -10,6 +25,9 @@ interface FolderTreeProps {
   folders: FolderType[];
   currentFolderId: string | null;
   onFolderClick: (id: string | null, name: string) => void;
+  onNewSubfolder?: (id: string) => void;
+  onRename?: (item: { id: string; name: string; type: "folder" }) => void;
+  onDelete?: (item: { id: string; type: "folder" }) => void;
   level?: number;
   isLoading?: boolean;
 }
@@ -18,6 +36,9 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   folders,
   currentFolderId,
   onFolderClick,
+  onNewSubfolder,
+  onRename,
+  onDelete,
   level = 0,
   isLoading = false,
 }) => {
@@ -38,6 +59,9 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
           folder={folder}
           currentFolderId={currentFolderId}
           onFolderClick={onFolderClick}
+          onNewSubfolder={onNewSubfolder}
+          onRename={onRename}
+          onDelete={onDelete}
           level={level}
         />
       ))}
@@ -49,8 +73,11 @@ const FolderTreeNode: React.FC<{
   folder: FolderType;
   currentFolderId: string | null;
   onFolderClick: (id: string | null, name: string) => void;
+  onNewSubfolder?: (id: string) => void;
+  onRename?: (item: { id: string; name: string; type: "folder" }) => void;
+  onDelete?: (item: { id: string; type: "folder" }) => void;
   level: number;
-}> = ({ folder, currentFolderId, onFolderClick, level }) => {
+}> = ({ folder, currentFolderId, onFolderClick, onNewSubfolder, onRename, onDelete, level }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasChildren = folder.children && folder.children.length > 0;
   const isActive = currentFolderId === folder.id;
@@ -61,46 +88,73 @@ const FolderTreeNode: React.FC<{
   };
 
   return (
-    <div className="space-y-1">
-      <div
-        onClick={() => onFolderClick(folder.id, folder.name)}
-        className={cn(
-          "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors cursor-pointer",
-          isActive
-            ? "bg-primary text-primary-foreground font-medium"
-            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        )}
-      >
-        <button
-          onClick={handleToggle}
-          className={cn(
-            "p-0.5 rounded-sm hover:bg-black/5 transition-opacity",
-            !hasChildren && "opacity-0 cursor-default"
-          )}
-          disabled={!hasChildren}
-        >
-          {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </button>
-        {isActive ? (
-          <FolderOpen className="h-4 w-4 shrink-0" />
-        ) : (
-          <Folder className="h-4 w-4 shrink-0" />
-        )}
-        <span className="truncate">{folder.name}</span>
-      </div>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="space-y-1">
+          <div
+            onClick={() => onFolderClick(folder.id, folder.name)}
+            className={cn(
+              "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors cursor-pointer",
+              isActive
+                ? "bg-primary text-primary-foreground font-medium"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            <button
+              onClick={handleToggle}
+              className={cn(
+                "p-0.5 rounded-sm hover:bg-black/5 transition-opacity",
+                !hasChildren && "opacity-0 cursor-default"
+              )}
+              disabled={!hasChildren}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {isActive ? (
+              <FolderOpen className="h-4 w-4 shrink-0" />
+            ) : (
+              <Folder className="h-4 w-4 shrink-0" />
+            )}
+            <span className="truncate">{folder.name}</span>
+          </div>
 
-      {isExpanded && hasChildren && (
-        <FolderTree
-          folders={folder.children!}
-          currentFolderId={currentFolderId}
-          onFolderClick={onFolderClick}
-          level={level + 1}
-        />
-      )}
-    </div>
+          {isExpanded && hasChildren && (
+            <FolderTree
+              folders={folder.children!}
+              currentFolderId={currentFolderId}
+              onFolderClick={onFolderClick}
+              onNewSubfolder={onNewSubfolder}
+              onRename={onRename}
+              onDelete={onDelete}
+              level={level + 1}
+            />
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={() => onFolderClick(folder.id, folder.name)}>
+          <Eye className="mr-2 h-4 w-4" /> Open
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onNewSubfolder?.(folder.id)}>
+          <FolderPlus className="mr-2 h-4 w-4" /> New Sub-folder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={() => onRename?.({ id: folder.id, name: folder.name, type: "folder" })}
+        >
+          <Pencil className="mr-2 h-4 w-4" /> Rename
+        </ContextMenuItem>
+        <ContextMenuItem
+          variant="destructive"
+          onClick={() => onDelete?.({ id: folder.id, type: "folder" })}
+        >
+          <Trash2 className="mr-2 h-4 w-4" /> Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };

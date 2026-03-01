@@ -24,6 +24,13 @@ import { useMemo, useState } from "react";
 import { FolderTree } from "@/components/files/folder-tree";
 import { Button } from "@/components/ui/button";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -68,6 +75,7 @@ export default function FileExplorerClient() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [targetParentId, setTargetParentId] = useState<string | null>(null);
 
   // UI state for rename
   const [renameItem, setRenameItem] = useState<{
@@ -139,11 +147,12 @@ export default function FileExplorerClient() {
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
       createFolderMutation.mutate(
-        { name: newFolderName, parentId: currentFolderId },
+        { name: newFolderName, parentId: targetParentId },
         {
           onSuccess: () => {
             setNewFolderOpen(false);
             setNewFolderName("");
+            setTargetParentId(null);
           },
         }
       );
@@ -220,6 +229,20 @@ export default function FileExplorerClient() {
               onFolderClick={handleFolderClick}
               currentFolderId={currentFolderId}
               isLoading={hierarchyLoading}
+              onNewSubfolder={(id) => {
+                setTargetParentId(id);
+                setNewFolderOpen(true);
+              }}
+              onRename={(item) => {
+                setRenameItem(item);
+                setRenameValue(item.name);
+              }}
+              onDelete={(item) => {
+                deleteFolderMutation.mutate({
+                  id: item.id,
+                  parentId: currentFolderId, // This will invalidate the current view if it's the parent
+                });
+              }}
             />
           </div>
         </ScrollArea>
@@ -228,7 +251,7 @@ export default function FileExplorerClient() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">
         <ScrollArea className="flex-1">
-          <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full animate-fade-in">
+          <div className="lg:p-8 space-y-8 max-w-7xl mx-auto w-full animate-fade-in">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -260,6 +283,20 @@ export default function FileExplorerClient() {
                         onFolderClick={handleFolderClick}
                         currentFolderId={currentFolderId}
                         isLoading={hierarchyLoading}
+                        onNewSubfolder={(id) => {
+                          setTargetParentId(id);
+                          setNewFolderOpen(true);
+                        }}
+                        onRename={(item) => {
+                          setRenameItem(item);
+                          setRenameValue(item.name);
+                        }}
+                        onDelete={(item) => {
+                          deleteFolderMutation.mutate({
+                            id: item.id,
+                            parentId: currentFolderId,
+                          });
+                        }}
                       />
                     </div>
                   </SheetContent>
@@ -274,7 +311,10 @@ export default function FileExplorerClient() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setNewFolderOpen(true)}
+                  onClick={() => {
+                    setTargetParentId(currentFolderId);
+                    setNewFolderOpen(true);
+                  }}
                   disabled={createFolderMutation.isPending}
                   className="shadow-sm"
                 >
@@ -367,180 +407,380 @@ export default function FileExplorerClient() {
             </div>
 
             {/* Items Container */}
-            <div className="min-h-[400px]">
-              {isLoading ? (
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                    <div
-                      key={i}
-                      className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-4 shadow-sm"
-                    >
-                      <Skeleton className="h-12 w-12 mx-auto rounded-xl" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-3 w-3/4 mx-auto" />
-                        <Skeleton className="h-2 w-1/2 mx-auto" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-32 bg-muted/10 rounded-3xl border border-dashed border-border/50 animate-in zoom-in-95 duration-500">
-                  <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
-                    <FolderPlus className="h-10 w-10 text-primary/40" />
-                  </div>
-                  <h3 className="text-xl font-bold tracking-tight">Your explorer is empty</h3>
-                  <p className="text-sm text-muted-foreground mt-2 text-center max-w-[320px] leading-relaxed">
-                    Organize your workspace by creating nested folders or uploading files directly
-                    here.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-8 px-8 h-11 rounded-xl transition-all hover:scale-105 active:scale-95"
-                    onClick={() => setNewFolderOpen(true)}
-                  >
-                    <FolderPlus className="mr-2 h-4 w-4" /> Create First Folder
-                  </Button>
-                </div>
-              ) : view === "grid" ? (
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group relative rounded-2xl border border-border/50 bg-card p-4 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:-translate-y-1 cursor-pointer overflow-hidden"
-                      onDoubleClick={() =>
-                        item.type === "folder" ? handleFolderClick(item.id, item.name) : null
-                      }
-                    >
-                      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 group-hover:duration-300">
-                        <ItemMenu
-                          item={item}
-                          onDelete={() => {
-                            if (item.type === "folder") {
-                              deleteFolderMutation.mutate({
-                                id: item.id,
-                                parentId: currentFolderId,
-                              });
-                            } else {
-                              deleteFileMutation.mutate({ id: item.id, folderId: currentFolderId });
-                            }
-                          }}
-                          onRename={() => {
-                            setRenameItem({ id: item.id, name: item.name, type: item.type });
-                            setRenameValue(item.name);
-                          }}
-                        />
-                      </div>
-                      <div className="flex flex-col items-center gap-4 pt-4 pb-2">
-                        <div className="relative">
-                          {item.type === "folder" ? (
-                            <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-primary/5">
-                              <FolderIcon className="h-8 w-8 text-primary transition-colors" />
-                            </div>
-                          ) : (
-                            <div className="w-16 h-16 bg-muted/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-border/30">
-                              {(() => {
-                                const Icon = getFileIcon(item.mimeType);
-                                return <Icon className="h-8 w-8 text-muted-foreground" />;
-                              })()}
-                            </div>
-                          )}
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div className="min-h-[400px]">
+                  {isLoading ? (
+                    <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                        <div
+                          key={i}
+                          className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-4 shadow-sm"
+                        >
+                          <Skeleton className="h-12 w-12 mx-auto rounded-xl" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-3 w-3/4 mx-auto" />
+                            <Skeleton className="h-2 w-1/2 mx-auto" />
+                          </div>
                         </div>
-                        <div className="text-center w-full px-2">
-                          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                            {item.name}
-                          </p>
-                          <p className="text-[10px] font-medium text-muted-foreground mt-1 uppercase tracking-wider">
-                            {item.type === "folder" ? "Folder" : formatSize(Number(item.size))}
-                          </p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border/50 bg-muted/20">
-                          <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
-                            Name
-                          </th>
-                          <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
-                            Type
-                          </th>
-                          <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
-                            Size
-                          </th>
-                          <th className="px-6 py-4 text-right"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/30">
-                        {items.map((item) => (
-                          <tr
-                            key={item.id}
-                            className="group hover:bg-primary/5 cursor-pointer transition-colors"
-                            onDoubleClick={() =>
-                              item.type === "folder" ? handleFolderClick(item.id, item.name) : null
-                            }
-                          >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                {item.type === "folder" ? (
-                                  <div className="p-2 bg-primary/5 rounded-lg group-hover:scale-105 transition-transform">
-                                    <FolderIcon className="h-4 w-4 text-primary" />
-                                  </div>
-                                ) : (
-                                  <div className="p-2 bg-muted/40 rounded-lg group-hover:scale-105 transition-transform">
-                                    {(() => {
-                                      const Icon = getFileIcon(item.mimeType);
-                                      return <Icon className="h-4 w-4 text-muted-foreground" />;
-                                    })()}
-                                  </div>
-                                )}
-                                <span className="font-semibold group-hover:text-primary transition-colors">
-                                  {item.name}
-                                </span>
+                  ) : items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-32 bg-muted/10 rounded-3xl border border-dashed border-border/50 animate-in zoom-in-95 duration-500">
+                      <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
+                        <FolderPlus className="h-10 w-10 text-primary/40" />
+                      </div>
+                      <h3 className="text-xl font-bold tracking-tight">Your explorer is empty</h3>
+                      <p className="text-sm text-muted-foreground mt-2 text-center max-w-[320px] leading-relaxed">
+                        Organize your workspace by creating nested folders or uploading files
+                        directly here.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-8 px-8 h-11 rounded-xl transition-all hover:scale-105 active:scale-95"
+                        onClick={() => {
+                          setTargetParentId(currentFolderId);
+                          setNewFolderOpen(true);
+                        }}
+                      >
+                        <FolderPlus className="mr-2 h-4 w-4" /> Create First Folder
+                      </Button>
+                    </div>
+                  ) : view === "grid" ? (
+                    <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                      {items.map((item) => (
+                        <ContextMenu key={item.id}>
+                          <ContextMenuTrigger>
+                            <div
+                              className="group relative rounded-2xl border border-border/50 bg-card p-4 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:-translate-y-1 cursor-pointer overflow-hidden"
+                              onDoubleClick={() =>
+                                item.type === "folder"
+                                  ? handleFolderClick(item.id, item.name)
+                                  : null
+                              }
+                            >
+                              <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 group-hover:duration-300">
+                                <ItemMenu
+                                  item={item}
+                                  onDelete={() => {
+                                    if (item.type === "folder") {
+                                      deleteFolderMutation.mutate({
+                                        id: item.id,
+                                        parentId: currentFolderId,
+                                      });
+                                    } else {
+                                      deleteFileMutation.mutate({
+                                        id: item.id,
+                                        folderId: currentFolderId,
+                                      });
+                                    }
+                                  }}
+                                  onRename={() => {
+                                    setRenameItem({
+                                      id: item.id,
+                                      name: item.name,
+                                      type: item.type,
+                                    });
+                                    setRenameValue(item.name);
+                                  }}
+                                />
                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-muted-foreground font-medium uppercase text-[10px] tracking-tight">
-                              {item.type === "folder"
-                                ? "Folder"
-                                : item.mimeType.split("/")[1] || "File"}
-                            </td>
-                            <td className="px-6 py-4 text-muted-foreground font-mono text-xs tabular-nums">
-                              {item.type === "folder" ? "--" : formatSize(Number(item.size))}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <ItemMenu
-                                item={item}
-                                onDelete={() => {
-                                  if (item.type === "folder") {
-                                    deleteFolderMutation.mutate({
-                                      id: item.id,
-                                      parentId: currentFolderId,
-                                    });
-                                  } else {
-                                    deleteFileMutation.mutate({
-                                      id: item.id,
-                                      folderId: currentFolderId,
-                                    });
-                                  }
-                                }}
-                                onRename={() => {
-                                  setRenameItem({ id: item.id, name: item.name, type: item.type });
-                                  setRenameValue(item.name);
-                                }}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              <div className="flex flex-col items-center gap-4 pt-4 pb-2">
+                                <div className="relative">
+                                  {item.type === "folder" ? (
+                                    <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-primary/5">
+                                      <FolderIcon className="h-8 w-8 text-primary transition-colors" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-16 h-16 bg-muted/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-border/30">
+                                      {(() => {
+                                        const Icon = getFileIcon(item.mimeType);
+                                        return <Icon className="h-8 w-8 text-muted-foreground" />;
+                                      })()}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-center w-full px-2">
+                                  <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                                    {item.name}
+                                  </p>
+                                  <p className="text-[10px] font-medium text-muted-foreground mt-1 uppercase tracking-wider">
+                                    {item.type === "folder"
+                                      ? "Folder"
+                                      : formatSize(Number(item.size))}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent className="w-48">
+                            {item.type === "folder" ? (
+                              <>
+                                <ContextMenuItem
+                                  onClick={() => handleFolderClick(item.id, item.name)}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" /> Open
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setTargetParentId(item.id);
+                                    setNewFolderOpen(true);
+                                  }}
+                                >
+                                  <FolderPlus className="mr-2 h-4 w-4" /> New Sub-folder
+                                </ContextMenuItem>
+                              </>
+                            ) : (
+                              <>
+                                <ContextMenuItem
+                                  onClick={async () => {
+                                    const { url } = await fileService.getFileUrl(item.id, "view");
+                                    window.open(url, "_blank");
+                                  }}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" /> View
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={async () => {
+                                    const { url } = await fileService.getFileUrl(
+                                      item.id,
+                                      "download"
+                                    );
+                                    const link = document.createElement("a");
+                                    link.href = url;
+                                    link.setAttribute("download", item.name);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                >
+                                  <Download className="mr-2 h-4 w-4" /> Download
+                                </ContextMenuItem>
+                              </>
+                            )}
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              onClick={() => {
+                                setRenameItem({ id: item.id, name: item.name, type: item.type });
+                                setRenameValue(item.name);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Rename
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              variant="destructive"
+                              onClick={() => {
+                                if (item.type === "folder") {
+                                  deleteFolderMutation.mutate({
+                                    id: item.id,
+                                    parentId: currentFolderId,
+                                  });
+                                } else {
+                                  deleteFileMutation.mutate({
+                                    id: item.id,
+                                    folderId: currentFolderId,
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/50 bg-muted/20">
+                              <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
+                                Name
+                              </th>
+                              <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
+                                Type
+                              </th>
+                              <th className="px-6 py-4 text-left font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
+                                Size
+                              </th>
+                              <th className="px-6 py-4 text-right"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/30">
+                            {items.map((item) => (
+                              <ContextMenu key={item.id}>
+                                <ContextMenuTrigger asChild>
+                                  <tr
+                                    className="group hover:bg-primary/5 cursor-pointer transition-colors"
+                                    onDoubleClick={() =>
+                                      item.type === "folder"
+                                        ? handleFolderClick(item.id, item.name)
+                                        : null
+                                    }
+                                  >
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        {item.type === "folder" ? (
+                                          <div className="p-2 bg-primary/5 rounded-lg group-hover:scale-105 transition-transform">
+                                            <FolderIcon className="h-4 w-4 text-primary" />
+                                          </div>
+                                        ) : (
+                                          <div className="p-2 bg-muted/40 rounded-lg group-hover:scale-105 transition-transform">
+                                            {(() => {
+                                              const Icon = getFileIcon(item.mimeType);
+                                              return (
+                                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                              );
+                                            })()}
+                                          </div>
+                                        )}
+                                        <span className="font-semibold group-hover:text-primary transition-colors">
+                                          {item.name}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-muted-foreground font-medium uppercase text-[10px] tracking-tight">
+                                      {item.type === "folder"
+                                        ? "Folder"
+                                        : item.mimeType.split("/")[1] || "File"}
+                                    </td>
+                                    <td className="px-6 py-4 text-muted-foreground font-mono text-xs tabular-nums">
+                                      {item.type === "folder"
+                                        ? "--"
+                                        : formatSize(Number(item.size))}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <ItemMenu
+                                        item={item}
+                                        onDelete={() => {
+                                          if (item.type === "folder") {
+                                            deleteFolderMutation.mutate({
+                                              id: item.id,
+                                              parentId: currentFolderId,
+                                            });
+                                          } else {
+                                            deleteFileMutation.mutate({
+                                              id: item.id,
+                                              folderId: currentFolderId,
+                                            });
+                                          }
+                                        }}
+                                        onRename={() => {
+                                          setRenameItem({
+                                            id: item.id,
+                                            name: item.name,
+                                            type: item.type,
+                                          });
+                                          setRenameValue(item.name);
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
+                                </ContextMenuTrigger>
+                                <ContextMenuContent className="w-48">
+                                  {item.type === "folder" ? (
+                                    <>
+                                      <ContextMenuItem
+                                        onClick={() => handleFolderClick(item.id, item.name)}
+                                      >
+                                        <Eye className="mr-2 h-4 w-4" /> Open
+                                      </ContextMenuItem>
+                                      <ContextMenuItem
+                                        onClick={() => {
+                                          setTargetParentId(item.id);
+                                          setNewFolderOpen(true);
+                                        }}
+                                      >
+                                        <FolderPlus className="mr-2 h-4 w-4" /> New Sub-folder
+                                      </ContextMenuItem>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ContextMenuItem
+                                        onClick={async () => {
+                                          const { url } = await fileService.getFileUrl(
+                                            item.id,
+                                            "view"
+                                          );
+                                          window.open(url, "_blank");
+                                        }}
+                                      >
+                                        <Eye className="mr-2 h-4 w-4" /> View
+                                      </ContextMenuItem>
+                                      <ContextMenuItem
+                                        onClick={async () => {
+                                          const { url } = await fileService.getFileUrl(
+                                            item.id,
+                                            "download"
+                                          );
+                                          const link = document.createElement("a");
+                                          link.href = url;
+                                          link.setAttribute("download", item.name);
+                                          document.body.appendChild(link);
+                                          link.click();
+                                          document.body.removeChild(link);
+                                        }}
+                                      >
+                                        <Download className="mr-2 h-4 w-4" /> Download
+                                      </ContextMenuItem>
+                                    </>
+                                  )}
+                                  <ContextMenuSeparator />
+                                  <ContextMenuItem
+                                    onClick={() => {
+                                      setRenameItem({
+                                        id: item.id,
+                                        name: item.name,
+                                        type: item.type,
+                                      });
+                                      setRenameValue(item.name);
+                                    }}
+                                  >
+                                    <Pencil className="mr-2 h-4 w-4" /> Rename
+                                  </ContextMenuItem>
+                                  <ContextMenuItem
+                                    variant="destructive"
+                                    onClick={() => {
+                                      if (item.type === "folder") {
+                                        deleteFolderMutation.mutate({
+                                          id: item.id,
+                                          parentId: currentFolderId,
+                                        });
+                                      } else {
+                                        deleteFileMutation.mutate({
+                                          id: item.id,
+                                          folderId: currentFolderId,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </ContextMenuItem>
+                                </ContextMenuContent>
+                              </ContextMenu>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-48">
+                <ContextMenuItem
+                  onClick={() => {
+                    setTargetParentId(currentFolderId);
+                    setNewFolderOpen(true);
+                  }}
+                >
+                  <FolderPlus className="mr-2 h-4 w-4" /> New Folder
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => document.getElementById("file-upload")?.click()}>
+                  <Upload className="mr-2 h-4 w-4" /> Upload File
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           </div>
           <div className="h-12" />
         </ScrollArea>
